@@ -6,8 +6,6 @@
 ```shell
 make build
 ```
-## Enter docker container as root
-
 ## Explicacion del proyecto.
 
 Primero de todo empiezo creando el entorno de prueba.
@@ -153,7 +151,7 @@ spec:
  ahora que ya tengo grafana escuchando a un mysql para obtener los datos, proceso a la creacion del script, donde principalmente voy a recoger los datos de elastic y exportarlos al mysql, una vez exportods, estos se podran visualizar en grafana, es por ello que creae un dashboard, para poder visualizar estos graficos.
 
 
- 
+
 
 
 
