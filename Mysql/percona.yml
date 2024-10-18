@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bbdd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: percona-pvc
+  namespace: bbdd
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: percona
+  namespace: bbdd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: percona
+  template:
+    metadata:
+      labels:
+        app: percona
+    spec:
+      containers:
+      - name: percona
+        image: percona-personalizado:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: P@ssw0rd
+        - name: MYSQL_PASSWORD
+          value: SecretP@assword
+        volumeMounts:
+        - name: percona-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: percona-storage
+        persistentVolumeClaim:
+          claimName: percona-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: percona
+  namespace: bbdd
+spec:
+  type: NodePort
+  ports:
+  - port: 3306
+    targetPort: 3306
+    nodePort: 30000
+  selector:
+    app: percona
