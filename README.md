@@ -4,6 +4,8 @@
 ## DATOS IMPORTANTES
 Para automatizar el despliegue de este proyecto, he creado un Makefile donde he ido creando comandos según la necesidad.
 
+EN MI CASO LA IP DE MINIKUBE ES 192.168.49.2, EN CASO QUE SEA DIFERENTE, HAY QUE CAMBIAR ESTA IP SOLAMENTE EN EL SCRIPT DE PYTHON, EN EL APARTADO DE db_config.
+
 * URL:
   * GRAFANA: IPMINUKUBE:32000
   * MYSQL:   IPMINUKUBE:30000
@@ -312,14 +314,109 @@ también compruebo que esté leyendo la BDD correctamente.
 
 ## Crear un script para recoger y graficar datos
 
+En este punto creo un dashboard directamente en Grafana, una vez lo tenía hecho lo he exportado para poder obtener el fichero .json.
+Ahora teniendo este fichero, he vuelto a modificar el Dockerfile de Grafana, añadiendo dos nuevos ficheros, el .json exportado anteriormente y  uno .yaml indicando la configuración necesaria para importar dicho dashboard.
 
 
+```Dockerfile
+COPY ./Grafana/config/dashboard.yml     /etc/grafana/provisioning/dashboards/dashboard.yaml
+COPY ./Grafana/config/Mysql.json        /etc/grafana/provisioning/dashboards/Mysql.json
+```
 
+```yaml
+apiVersion: 1
 
+providers:
+- name: "Mysql"
+  orgId: 1
+  type: file
+  disableDeletion: false
+  updateIntervalSeconds: 10
+  allowUiUpdates: false
+  options:
+    path: /etc/grafana/provisioning/dashboards
+    foldersFromFilesStructure: true
 
+``` 
+El dashboard final se visualiza así:
 
+![dashboard](./capturas/Dashboard1.png)
 
+Al tener ya este preparado, procedo a la creación del script.
 
+Al principio de todo he tenido problemas con obtener los datos de curl proporcionado en el enunciado, ya que no obtenía los datos mencionados en dicho enunciado, investigando he encontrado la solución, ya que no había recogido datos de elastic de esta manera.
 
+La solución que he encontrado, es pasarle una query a la consulta indicándole los datos que necesito.
 
-SecretP@assword
+En dicha query, le indico que quiero recoger todos los datos de monitor.name, synthetics.step.name
+y synthetics.step.status, también le digo que sea desencante, ya que me estaba arrojando datos muy antiguos y por ultimo, le digo que quiero obtener minimo 50 objetos, ya que solo me estaba pasando 10. 
+
+```python
+query = {
+    "query": {
+        "match_all": {}
+    },
+    "_source": ["monitor.name", "synthetics.step.name", "synthetics.step.status"],
+    "size": 50,
+    "sort": [
+        {
+            "@timestamp": {
+                "order": "desc"
+            }
+        }
+    ]
+}
+```
+
+Después de obtener los datos de Elastic, el script procesa cada uno de los resultados y guarda en la base de datos los datos relevantes como el monitor_name , step_name y step_status Además, se utilizo un mecanismo para evitar duplicados en la base de datos utilizando el ID único de Elastic. Si el ID ya existe, el script actualiza los campos correspondientes en lugar de insertar una nueva fila.
+
+Como me he encontrado sondas sin un step_name y status, he creado una condición para que también me inserte estos con el valor de null en los campos correspondientes.
+
+```python 
+
+     for hit in data['hits']['hits']:
+        monitor_name = hit['_source']['monitor']['name']
+        step_name = hit['_source'].get('synthetics', {}).get('step', {}).get('name')
+        step_status = hit['_source'].get('synthetics', {}).get('step', {}).get('status')
+        elastic_id = hit['_id'] 
+
+        if step_name and step_status: 
+            cursor.execute("""
+                INSERT INTO monitoring (id, monitor_name, step_name, step_status) 
+                VALUES (%s, %s, %s, %s) 
+                ON DUPLICATE KEY UPDATE 
+                monitor_name = VALUES(monitor_name), 
+                step_name = VALUES(step_name), 
+                step_status = VALUES(step_status)
+            """, (elastic_id, monitor_name, step_name, step_status))
+        else:  
+            cursor.execute("""
+                INSERT INTO monitoring (id, monitor_name, step_name, step_status) 
+                VALUES (%s, %s, %s, %s) 
+                ON DUPLICATE KEY UPDATE 
+                monitor_name = VALUES(monitor_name), 
+                step_name = VALUES(step_name), 
+                step_status = VALUES(step_status)
+            """, (elastic_id, monitor_name, None, None))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+```
+Para lanzar este script y no haya problemas de compatibilidad, he decidido crear un Dockerfile con Python y las bibliotecas necesarias.
+
+Por ende, he creado también el comando en el Makefile para construir y ejecutar el contenedor con dicho script,
+
+Me he encontrado con el problema de que Docker no estaba encontrado la IP de Minikube, es por ello que cambio el backend de Docker al de minikube y añado la red host, para que pueda acceder a la IP de minikube.
+
+```Makefile
+docker-build-python:
+	docker build -f ./Scripts/Dockerfile -t $(DOCKER_NAME_PYTHON) --no-cache  .
+docker-run-python:
+	@eval $(minikube docker-env) && docker run --rm --network host -v $(PWD)/Scripts:/app -w /app $(DOCKER_NAME_PYTHON) python3 fetch_data.py
+```
+Lanzando dicho script el dashboard de Grafana se visualiza de la siguiente manera
+
+![dashboard](./capturas/Dashboard2.png)
+
+donde hago un recuento de todos los datos que hay en la BBDD, un gráfico para controlar el estado de cada sonda y por último, una tabla donde se puede visualizar todos los datos de la BBDD

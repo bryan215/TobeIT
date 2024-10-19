@@ -1,6 +1,7 @@
 SHELL=/bin/bash
 DOCKER_NAME_GRAFANA	= grafana-personalizado:latest
 DOCKER_NAME_PERCONA = percona-personalizado:latest
+DOCKER_NAME_PYTHON =  python-personalizado:latest
 GRAFANA_POD_NAME = $(shell kubectl get pods -n grafana -l app=grafana -o jsonpath='{.items[0].metadata.name}')
 PERCONA_POD_NAME = $(shell kubectl get pods -n bbdd -l app=percona -o jsonpath='{.items[0].metadata.name}')
 
@@ -10,12 +11,14 @@ default: help ;
 help: ## Outputs this help screen
 	@grep -E '(^[a-zA-Z0-9_-]+:.*?##.*$$)|(^##)' Makefile | awk 'BEGIN {FS = ":.*?## "}{printf "\033[32m%-30s\033[0m %s\n", $$1, $$2}' | sed -e 's/\[32m##/[33m/'
 ## start proyect
-build: is-minikube-running docker-build deploy-grafana deploy-percona ps-grafana ps-percona
+build: is-minikube-running docker-build deploy-grafana deploy-percona ps-grafana ps-percona docker-run-python
 
+destroy: delete-deploy-grafana delete-deploy-percona
 
 #### Minikube ###
 run-minikube:
-	@minikube start
+	@minikube start --driver=docker
+
 
 is-minikube-running:
 	@if ! minikube status | grep -q "host: Running"; then \
@@ -46,12 +49,32 @@ percona-logs:
 
 
 ### 🐋 Docker 🐋 ###
-docker-build: docker-build-grafana docker-build-percona
+docker-build: docker-build-grafana docker-build-percona docker-build-python
 docker-build-grafana: ## docker-build
 	@eval $$(minikube docker-env) && docker build -f ./Grafana/Dockerfile -t $(DOCKER_NAME_GRAFANA) --no-cache  .
 	
-docker-build-percona: ## docker-build
+docker-build-percona:
 	@eval $$(minikube docker-env) && docker build -t $(DOCKER_NAME_PERCONA) -f ./Mysql/Dockerfile --no-cache .
+docker-build-python:
+	docker build -f ./Scripts/Dockerfile -t $(DOCKER_NAME_PYTHON) --no-cache  .
+docker-run-python: check-db
+	@eval $(minikube docker-env) && docker run --rm --network host -v $(PWD)/Scripts:/app -w /app $(DOCKER_NAME_PYTHON) python3 fetch_data.py
+
+check-db:
+	@echo "Esperando que la base de datos esté disponible..."
+	@until nc -z -v -w30 192.168.49.2 30000; do \
+		echo "Esperando..."; \
+		sleep 5; \
+	done
+	@echo "La base de datos está lista."
+
+
+
+
+
+
+
+
 
 
 
