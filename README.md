@@ -3,7 +3,8 @@
 > Tener instalado Docker, minikube y Make para poder ejecutar el proyecto de forma automática.
 
 ## DATOS IMPORTANTES
-Probado en Linux (Ubuntu)
+Probado solo en  Linux (Ubuntu)
+
 Para automatizar el despliegue de este proyecto, he creado un Makefile donde he ido creando comandos según la necesidad.
 
 Se puede lanzar
