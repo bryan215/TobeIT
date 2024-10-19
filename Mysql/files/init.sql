@@ -3,10 +3,10 @@ GRANT SELECT ON synthetics.* TO 'grafana'@'%';
 FLUSH PRIVILEGES;
 
 CREATE TABLE monitoring (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     monitor_name VARCHAR(255),
     step_name VARCHAR(255),
-    step_status VARCHAR(50),
+    step_status VARCHAR(255),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

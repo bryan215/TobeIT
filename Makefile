@@ -42,13 +42,13 @@ delete-deploy-percona:
 ps-percona:
 	@kubectl get pods -n bbdd
 percona-logs:
-	@kubectl logs $(PERCONA_POD_NAME) -n grafana
+	@kubectl logs $(PERCONA_POD_NAME) -n bbdd
 
 
 ### 🐋 Docker 🐋 ###
 docker-build: docker-build-grafana docker-build-percona
 docker-build-grafana: ## docker-build
-	@eval $$(minikube docker-env) && docker build -f ./Grafana/Dockerfile -t $(DOCKER_NAME_GRAFANA) .
+	@eval $$(minikube docker-env) && docker build -f ./Grafana/Dockerfile -t $(DOCKER_NAME_GRAFANA) --no-cache  .
 	
 docker-build-percona: ## docker-build
 	@eval $$(minikube docker-env) && docker build -t $(DOCKER_NAME_PERCONA) -f ./Mysql/Dockerfile --no-cache .
