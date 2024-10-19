@@ -355,6 +355,18 @@ El dashboard final se visualiza así:
 
 Al tener ya este preparado, procedo a la creación del script.
 
+La conexión a la BBDD, lo hago utilizando el usuario tobeit, creado en la imagen Dockerfile, ya que necesito un usuario con permisos para insertar datos.
+
+```python
+db_config = {
+    'host': '192.168.49.2',
+    'port': '30000',
+    'user': 'tobeit',
+    'password': 'SecretP@assword',
+    'database': 'synthetics'
+}
+```
+
 Al principio de todo he tenido problemas con obtener los datos de curl proporcionado en el enunciado, ya que no obtenía los datos mencionados, investigando he encontrado la solución, ya que no había recogido datos de elastic de esta manera.
 
 La solución que he encontrado, es pasarle una query a la consulta indicándole los datos que necesito.
