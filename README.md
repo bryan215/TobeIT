@@ -4,6 +4,13 @@
 ## DATOS IMPORTANTES
 Para automatizar el despliegue de este proyecto, he creado un Makefile donde he ido creando comandos según la necesidad.
 
+Se puede lanzar
+
+```
+ make help
+```
+para visualizar la totalidad de comandos creados.
+
 EN MI CASO LA IP DE MINIKUBE ES 192.168.49.2, EN CASO QUE SEA DIFERENTE, HAY QUE CAMBIAR ESTA IP SOLAMENTE EN EL SCRIPT DE PYTHON, EN EL APARTADO DE db_config.
 
 * URL:
@@ -57,7 +64,7 @@ en el cual incluyo la instalacion del plugin de percona, utilizando una variable
 ENV GF_INSTALL_PLUGINS=percona-percona-app
 ```
 
-Así mismo, también incluyo la configuración necesaria para que Grafana se pueda conectar a la BBDD y extraer los datos del mismo,
+Así mismo, también incluyo la configuración necesaria para que Grafana se pueda conectar a la BBDD y extraer los datos del mismo.
 
 ```yaml
 apiVersion: 1
@@ -85,7 +92,7 @@ COPY ./Grafana/config/datasource.yml /etc/grafana/provisioning/datasources/datas
 ```
 De esta forma dejo esta imagen preparada para obtener datos de un MYSQL sin necesidad de configuraciones a posteriori, la mayoría de estos datos de configuración son estáticos, pero se podrían manejar con variables de entorno, pongo el ejemplo en la contraseña, ya que más adelante lo controlaré con un secret de Kubernetes.
 
-Para construir dicha image docker he creado otro comando en el Makefile, donde previamente tengo que cambiar el back-end de Docker para que utilice el de Minikube, ya que si no está imagen no será reconocida por Minikube, ha esta imagen la nombro como GRAFANA-PERSONALIZADO, con el tag latest utilizando una variable. 
+Para construir dicha image docker he creado otro comando en el Makefile, donde previamente tengo que cambiar el backend de Docker para que utilice el de Minikube, ya que si no está imagen no será reconocida por Minikube, ha esta imagen la nombro con el nombre GRAFANA-PERSONALIZADO, con el tag latest utilizando una variable. 
 
 ```Makefile
 docker-build-grafana: 
@@ -110,13 +117,14 @@ GRANT SELECT ON synthetics.* TO 'grafana'@'%';
 FLUSH PRIVILEGES;
 
 CREATE TABLE monitoring (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     monitor_name VARCHAR(255),
     step_name VARCHAR(255),
     step_status VARCHAR(255),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
-La imagen oficial de Percona, permite ejecutar este init.sql al momento de iniciar el contenedor, para ello solamente tenemos que guardar este fichero en la ruta /docker-entrypoint-initdb.d/
+La imagen oficial de Percona, permite ejecutar este init.sql al momento de iniciar el contenedor, para ello solamente tengo  que guardar este fichero en la ruta /docker-entrypoint-initdb.d/
 
 ```Dockerfile
 COPY ./Mysql/files/init.sql /docker-entrypoint-initdb.d/init.sql
@@ -126,7 +134,7 @@ Teniendo ya las imágenes preparadas para este entorno, empiezo con la creación
 
 Para levantar Grafana en K8s, es bastante sencillo, ya que en la propia documentación te facilitan los manifiestos necesarios, en este caso parto de esta base, en la cual se puede encontrar en este [enlace](https://grafana.com/docs/grafana/latest/setup-grafana/installation/kubernetes/).
 
-Lo primero que edito es el SERVICIO, ya que está en loadbalancer y como estamos en un clúster en local con minikube este tipo de servicio no es funcional sin ayuda de plugins externos, y como tampoco se ha configurado un ingress controller, cambio este servicio a nodePort, asignándole el puerto 32000, ya que sin una configuración previa de Kubernetes, este no acepta puertos inferiores al 30000.
+Lo primero que edito es el SERVICIO, ya que está en loadbalancer y como estamos en un clúster en local con minikube este tipo de servicio no es funcional sin ayuda de plugins externos, y como tampoco se ha configurado un ingress controller, cambio este servicio a nodePort, asignándole el puerto 32000, ya que sin una configuración previa de Kubernetes este no acepta puertos inferiores al 30000.
 
 
 ```yaml
@@ -228,7 +236,7 @@ data:
   password-tobeit: U2VjcmV0UEBhc3N3b3Jk
 
 ```
-Creo también un namespace llamado percona, y un PV para hacer los datos persistentes, como también creo un servido tipo nodePort con el puerto 30000.
+Creo también un namespace llamado bbdd, y un PV para hacer los datos persistentes, como también creo un servido tipo nodePort con el puerto 30000.
 
 
 Como hice con grafana, aquí también creo comandos para crear la imagen docker con el nombre percona-personalizado:latest
@@ -315,7 +323,7 @@ también compruebo que esté leyendo la BDD correctamente.
 ## Crear un script para recoger y graficar datos
 
 En este punto creo un dashboard directamente en Grafana, una vez lo tenía hecho lo he exportado para poder obtener el fichero .json.
-Ahora teniendo este fichero, he vuelto a modificar el Dockerfile de Grafana, añadiendo dos nuevos ficheros, el .json exportado anteriormente y  uno .yaml indicando la configuración necesaria para importar dicho dashboard.
+Ahora teniendo este fichero, he vuelto a modificar el Dockerfile de Grafana, añadiendo dos nuevos ficheros, el .json exportado anteriormente y un .yaml indicando la configuración necesaria para importar dicho dashboard.
 
 
 ```Dockerfile
@@ -344,12 +352,12 @@ El dashboard final se visualiza así:
 
 Al tener ya este preparado, procedo a la creación del script.
 
-Al principio de todo he tenido problemas con obtener los datos de curl proporcionado en el enunciado, ya que no obtenía los datos mencionados en dicho enunciado, investigando he encontrado la solución, ya que no había recogido datos de elastic de esta manera.
+Al principio de todo he tenido problemas con obtener los datos de curl proporcionado en el enunciado, ya que no obtenía los datos mencionados, investigando he encontrado la solución, ya que no había recogido datos de elastic de esta manera.
 
 La solución que he encontrado, es pasarle una query a la consulta indicándole los datos que necesito.
 
 En dicha query, le indico que quiero recoger todos los datos de monitor.name, synthetics.step.name
-y synthetics.step.status, también le digo que sea desencante, ya que me estaba arrojando datos muy antiguos y por ultimo, le digo que quiero obtener minimo 50 objetos, ya que solo me estaba pasando 10. 
+y synthetics.step.status, también le digo que sea desencante, ya que me estaba arrojando datos muy antiguos, por ultimo, le digo que quiero obtener minimo 50 objetos, ya que solo me estaba pasando 10. 
 
 ```python
 query = {
@@ -368,7 +376,7 @@ query = {
 }
 ```
 
-Después de obtener los datos de Elastic, el script procesa cada uno de los resultados y guarda en la base de datos los datos relevantes como el monitor_name , step_name y step_status Además, se utilizo un mecanismo para evitar duplicados en la base de datos utilizando el ID único de Elastic. Si el ID ya existe, el script actualiza los campos correspondientes en lugar de insertar una nueva fila.
+Después de obtener los datos de Elastic, el script procesa cada uno de los resultados y guarda en la base de datos los datos relevantes como el monitor_name , step_name y step_status Además, utilizo un mecanismo para evitar duplicados en la base de datos utilizando el ID único de Elastic. Si el ID ya existe, el script actualiza los campos correspondientes en lugar de insertar una nueva fila.
 
 Como me he encontrado sondas sin un step_name y status, he creado una condición para que también me inserte estos con el valor de null en los campos correspondientes.
 
@@ -403,9 +411,9 @@ Como me he encontrado sondas sin un step_name y status, he creado una condición
     conn.close()
 
 ```
-Para lanzar este script y no haya problemas de compatibilidad, he decidido crear un Dockerfile con Python y las bibliotecas necesarias.
+Para lanzar este script y que no haya problemas de compatibilidad, he decidido crear un Dockerfile con Python y las bibliotecas necesarias.
 
-Por ende, he creado también el comando en el Makefile para construir y ejecutar el contenedor con dicho script,
+Por ende, he creado también el comando en el Makefile para construir y ejecutar el contenedor con dicho script.
 
 Me he encontrado con el problema de que Docker no estaba encontrado la IP de Minikube, es por ello que cambio el backend de Docker al de minikube y añado la red host, para que pueda acceder a la IP de minikube.
 
@@ -415,8 +423,26 @@ docker-build-python:
 docker-run-python:
 	@eval $(minikube docker-env) && docker run --rm --network host -v $(PWD)/Scripts:/app -w /app $(DOCKER_NAME_PYTHON) python3 fetch_data.py
 ```
-Lanzando dicho script el dashboard de Grafana se visualiza de la siguiente manera
+Dichos comandos los he incluido en el Make build, para automatizar este proceso, tambien he tenido que añadir un nuevo comando que comprueba previamente si la BBDD esta levantada antes de ejecutar el script, ya que sino este fallaría.
+
+```makefile
+check-db:
+	@echo "Esperando que la base de datos esté disponible..."
+	@until nc -z -v -w30 192.168.49.2 30000; do \
+		echo "Esperando..."; \
+		sleep 5; \
+	done
+	@echo "La base de datos está lista."
+```
+
+Lanzando el script, procedo a visualizar el dashboard de Grafana:
 
 ![dashboard](./capturas/Dashboard2.png)
 
-donde hago un recuento de todos los datos que hay en la BBDD, un gráfico para controlar el estado de cada sonda y por último, una tabla donde se puede visualizar todos los datos de la BBDD
+Donde proceso a crear 3 Visualizaciones,en el primero podemos la suma total de datos que hay en la BDD, un gráfico para controlar el estado de cada sonda y por último, una tabla donde se puede visualizar todos los datos de la BBDD.
+
+Para finalizar, he dejado creado un comando para eliminar el proyecto.
+
+```shell
+  make destroy
+```
