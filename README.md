@@ -1,6 +1,6 @@
 # PRUEBA DE CONOCIMIENTO TobeIT. 
 ## REQUISITOS
-> Tener instalado Docker, minikube y Make para poder ejecutar el proyecto de forma automática.
+> Tener instalado Docker, minikube, kubectl y Make para poder ejecutar el proyecto de forma automática.
 
 ## DATOS IMPORTANTES
 Probado solo en  Linux (Ubuntu)
