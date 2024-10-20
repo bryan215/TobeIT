@@ -14,7 +14,7 @@ Se puede lanzar
 ```
 para visualizar la totalidad de comandos creados.
 
-EN MI CASO LA IP DE MINIKUBE ES 192.168.49.2, EN CASO QUE SEA DIFERENTE, HAY QUE CAMBIAR ESTA IP SOLAMENTE EN EL SCRIPT DE PYTHON, EN EL APARTADO DE db_config.
+EN MI CASO LA IP DE MINIKUBE ES 192.168.49.2, EN CASO QUE SEA DIFERENTE, HAY QUE CAMBIAR ESTA IP EN EL SCRIPT DE PYTHON, EN EL APARTADO DE db_config Y EN EL MAKEFILE EN LA VARIABLE IPMINIKUBE.
 
 * ACCESOS:
   * GRAFANA: http://192.168.49.2:32000
@@ -454,10 +454,34 @@ Lanzando el script, procedo a visualizar el dashboard de Grafana:
 
 ![dashboard](./capturas/Dashboard2.png)
 
-Donde proceso a crear 3 Visualizaciones,en el primero podemos la suma total de datos que hay en la BDD, un gráfico para controlar el estado de cada sonda y por último, una tabla donde se puede visualizar todos los datos de la BBDD.
+En el primer gráfico representa la suma total de filas que hay en la tabla.
+```sql
+SELECT COUNT(*) AS total_count
+FROM monitoring;
+```
+Tambien he creado otro grafico donde represento un conteo por estado de la sonda, ya sea null, failed o succeeded
 
-Para finalizar, he dejado creado un comando para eliminar el proyecto.
+``` sql
+SELECT 
+    COALESCE(step_status, 'null') AS step_status,
+    COUNT(*) AS count
+FROM monitoring
+GROUP BY step_status;
+
+```
+por último, he generado una tabla donde se visualizan todos los datos que hay en la BBDD.
+```sql
+SELECT 
+    monitor_name AS "Nombre del Monitor", 
+    step_name AS "Nombre del Paso", 
+    step_status AS "Estado del Paso"
+FROM 
+    monitoring
+```
+
+Para finalizar con este proyecto, he dejado un comando preparado para eliminar el proyecto.
 
 ```shell
   make destroy
+
 ```

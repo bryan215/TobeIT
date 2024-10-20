@@ -2,6 +2,7 @@ SHELL=/bin/bash
 DOCKER_NAME_GRAFANA	= grafana-personalizado:latest
 DOCKER_NAME_PERCONA = percona-personalizado:latest
 DOCKER_NAME_PYTHON =  python-personalizado:latest
+IP_MINIKUBE = 192.168.49.2
 GRAFANA_POD_NAME = $(shell kubectl get pods -n grafana -l app=grafana -o jsonpath='{.items[0].metadata.name}')
 PERCONA_POD_NAME = $(shell kubectl get pods -n bbdd -l app=percona -o jsonpath='{.items[0].metadata.name}')
 
@@ -62,15 +63,11 @@ docker-run-python: check-db ## ejecutar script python
 
 check-db: ## comprobar si la BBDD esta conectada. 
 	@echo "Esperando que la base de datos esté disponible..."
-	@until nc -z -v -w30 192.168.49.2 30000; do \
+	@until nc -z -v -w30 ${IP_MINIKUBE} 30000; do \
 		echo "Esperando..."; \
 		sleep 5; \
 	done
 	@echo "La base de datos está lista."
-
-
-
-
 
 
 
